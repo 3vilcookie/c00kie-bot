@@ -22,8 +22,12 @@ var (
 	Token    = flag.String("token", "", "API token (required)")
 	Name     = flag.String("name", "c00kie-bot", "Name of the bot")
 	Commands = map[string]Command{
-		"hello": {Execute: helloCommand, Description: "Say hello"},
+		"hello":       {Execute: helloCommand, Description: "Say hello"},
+		"supportme":   {Execute: supportmeCommand, Description: "Helps you win an argument with your friends"},
+		"stopsupport": {Execute: stopsupportCommand, Description: "Stops helping you in an argument"},
 	}
+
+	SupportedUsers = []string{}
 )
 
 func main() {
@@ -79,7 +83,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if !strings.HasPrefix(m.Content, COMMAND_PREFIX) {
-		fmt.Println("Not a command")
+
+		/* Check if user needs support */
+		if doesUserNeedSupport(m.Author.Username) {
+			err := s.MessageReactionAdd(m.ChannelID, m.ID, "\U0001F44D")
+			if err != nil {
+				fmt.Printf("Error supporting %s: %s\n", m.Author.Username, err)
+			}
+		}
 		return
 	}
 
@@ -127,4 +138,40 @@ func listCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if err != nil {
 		fmt.Printf("Error sending back message: %s\n", err)
 	}
+}
+
+func supportmeCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
+	SupportedUsers = append(SupportedUsers, m.Author.Username)
+
+	msg := fmt.Sprintf(
+		"I am supporting %s now",
+		strings.Join(SupportedUsers, ","),
+	)
+
+	_, err := s.ChannelMessageSend(m.ChannelID, msg)
+
+	if err != nil {
+		fmt.Printf("Error sending back message: %s\n", err)
+	}
+
+}
+
+func stopsupportCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
+	for i, name := range SupportedUsers {
+		if name == m.Author.Username {
+			SupportedUsers[i] = ""
+		}
+	}
+}
+
+func doesUserNeedSupport(name string) bool {
+	for _, supportee := range SupportedUsers {
+		if name == supportee {
+			fmt.Printf("%s needs my support\n", name)
+			return true
+		}
+	}
+
+	fmt.Println("No one needs my support")
+	return false
 }
